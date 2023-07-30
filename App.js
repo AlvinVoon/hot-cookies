@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import MapView, {Marker} from 'react-native-maps';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, Button, Pressable, Switch, Image } from 'react-native';
 import { initializeApp } from 'firebase/app';
-import { getDatabase, ref, onValue } from 'firebase/database';
+import { getDatabase, ref, onValue, startAfter, set } from 'firebase/database';
 
 const firebaseConfig = {
   apiKey: "AIzaSyC1eKSV7e9L_nQMYEkPmD2qjcwNAALS1rU",
@@ -20,50 +20,152 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase();
 
 export default function App() {
-  const initialRegion = {
-    latitude: 4.378394489589697, // Replace with the latitude of the location you want to zoom into
-    longitude: 113.97738162630306, // Replace with the longitude of the location you want to zoom into
-    latitudeDelta: 0.001, // The amount of latitude to be displayed on the map
-    longitudeDelta: 0.001, // The amount of longitude to be displayed on the map
+  const [isSwitchOn, setIsSwitchOn] = useState(false);
+
+  const handleSwitchToggle = () => {
+    setIsSwitchOn((prevState) => !prevState);
+    updateFirebaseValue(!isSwitchOn);
   };
-  const markerCoordinate = {
-    latitude: 37.78825, // Replace with the latitude of the marker location
-    longitude: -122.4324, // Replace with the longitude of the marker location
+
+  const updateFirebaseValue = (value) => {
+    // Assuming you have a reference to your Firebase database
+    const firebaseRef = ref(getDatabase(), '/door_status');
+    // Set the new value in the database
+    set(firebaseRef, value ? 1 : 0)
   };
+
+  const [initialRegion, setInitialRegion] = useState({
+    latitude: 0,
+    longitude: 0,
+    latitudeDelta: 0.001,
+    longitudeDelta: 0.001,
+  });
+
+  const [markerCoordinate, setMarkerCoordinate] = useState({
+    latitude: 0,
+    longitude: 0,
+  });
+  
   const [starCount, setStarCount] = useState(null);
+  const [humi, setHumi] = useState(null);
+  const [temp, setTemp] = useState(null);
+  const [long, setLong] = useState(null);
+  const [lat, setLat] = useState(null);
+  const [door, setDoor] = useState(null);
 
   useEffect(() => {
-    const postId = 'hello'; // Replace 'your-post-id' with the actual post ID
-
-    // Define the function to update the star count
     const updateStarCount = (count) => {
       setStarCount(count);
     };
 
-    const starCountRef = ref(db, '/hello');
+    const updateHumi = (value) => {
+      setHumi(value);
+    };
+
+    const updateTemp = (value) => {
+      setTemp(value);
+    };
+
+    const updateDoor = (value) => {
+      setDoor(value);
+    };
+
+    const starCountRef = ref(getDatabase(), '/hello');
+    const humiRef = ref(getDatabase(), '/humidity');
+    const tempRef = ref(getDatabase(), '/temperature');
+    const doorRef = ref(getDatabase(), '/door_status');
+
     onValue(starCountRef, (snapshot) => {
       const data = snapshot.val();
       updateStarCount(data);
     });
 
-    // Clean up the Firebase listener when the component unmounts
+    onValue(humiRef, (snapshot) => {
+      const data = snapshot.val();
+      updateHumi(data);
+    });
+
+    onValue(tempRef, (snapshot) => {
+      const data = snapshot.val();
+      updateTemp(data);
+    });
+
+    onValue(doorRef, (snapshot) => {
+      const data = snapshot.val();
+      updateDoor(data);
+    });
+
+    const firebaseRef = ref(getDatabase(), '/location');
+    const unsubscribe = onValue(firebaseRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        setMarkerCoordinate({
+          latitude: data.latitude,
+          longitude: data.longitude,
+        });
+      }
+    });
+    // Clean up the Firebase listeners when the component unmounts
     return () => {
-      // Turn off the listener to avoid memory leaks
+      // Turn off the listeners to avoid memory leaks
       onValue(starCountRef, null);
+      onValue(humiRef, null);
+      onValue(tempRef, null);
+      onValue(doorRef, null);
+      unsubscribe();
     };
   }, []);
 
   return (
     <View style={styles.container}>
-      <View style={styles.border}>
-      <Text style={styles.title}>Your Mum's Box</Text>
+      <View style={styles.row}>
+      <Text style={styles.title}>CONTAG</Text>    
       </View>
-      <View style={styles.border}>
-      <Text>Star Count: {starCount !== null ? starCount : 'Loading...'}</Text>
-      </View>
-      <MapView style={styles.map} initialRegion={initialRegion}>
-      <Marker coordinate={markerCoordinate} pinColor="red" />
+        {markerCoordinate.latitude !== 0 && markerCoordinate.longitude !== 0 && (
+        <MapView
+          style={styles.map}
+          region={{
+            latitude: markerCoordinate.latitude,
+            longitude: markerCoordinate.longitude,
+            latitudeDelta: 0.1,
+            longitudeDelta: 0.1,
+          }}
+        >
+          <Marker coordinate={markerCoordinate} pinColor="red" />
         </MapView>
+      )}
+        <View style={styles.column}>
+          <View style={styles.row}>
+            <View style={styles.column}>
+            <Text style={styles.para}>TEMPERATURE</Text>
+            <Text style={styles.val}>{temp}</Text>
+            </View>
+            <View style={{width:'15%'}}></View>
+            <View style={styles.column}>
+            <Text style={styles.para}>HUMIDITY</Text>
+            <Text style={styles.val}>{humi}</Text>
+            </View>
+          </View>
+          <View style={styles.row}>
+            <View>
+              <Pressable   style={({pressed}) => [
+          {
+            backgroundColor: pressed ? 'rgb(210, 230, 255)' : '#99CCFF',
+          },
+          styles.wrapperCustom,
+        ]}>
+                <Text style={{fontSize:35}}>CCTV</Text>
+              </Pressable>
+            </View>
+            <Switch style={styles.switch}
+        trackColor={{false: '#767577', true: '#81b0ff'}}
+        thumbColor={isSwitchOn ? '#f5dd4b' : '#f4f3f4'}
+        ios_backgroundColor="#3e3e3e"
+        onValueChange={handleSwitchToggle}
+        value={isSwitchOn}
+      />
+            </View>
+        </View>
     </View>
   );
 }
@@ -71,19 +173,40 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
+    marginTop:'5%',
     alignItems: 'center',
     backgroundColor: '#F5FCFF',
+    width:'100%',
+    height:'100%',
   },
   map: {
     width: '100%',
-    height: '100%',
+    height: '50%',
+  },
+  row:{
+    display:'flex',
+    flexDirection:'row',
+  },
+  column:{
+    display:'flex',
+    flexDirection:'column',
+    marginVertical:'10%',
   },
   title:{
-    fontSize:50,
-    padding:25,
+    fontSize:25,
+    padding:5,
   },
-  border:{
-    borderWidth:5,
+  wrapperCustom: {
+    borderRadius: 6,
+    padding: 6,
+  },
+  switch:{
+    marginLeft:'30%',
+  },
+  para:{
+    fontSize:20
+  },
+  val:{
+    fontSize:15
   }
 });
