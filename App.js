@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import MapView, {Marker} from 'react-native-maps';
+import MapView, {Marker, Polyline} from 'react-native-maps';
 import { StyleSheet, Text, View, Button, Pressable, Switch, Image } from 'react-native';
 import { initializeApp } from 'firebase/app';
 import { getDatabase, ref, onValue, startAfter, set } from 'firebase/database';
@@ -21,6 +21,7 @@ const db = getDatabase();
 
 export default function App() {
   const [isSwitchOn, setIsSwitchOn] = useState(false);
+  const [polylineCoordinates, setPolylineCoordinates] = useState([]);
 
   const handleSwitchToggle = () => {
     setIsSwitchOn((prevState) => !prevState);
